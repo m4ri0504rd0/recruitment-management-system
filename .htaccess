@@ -1,0 +1,10 @@
+# Aktiviert das Umschreiben von URLs
+RewriteEngine On
+# Es wird überprüft, ob der REQUEST_URI nicht bereits mit "/public/" beginnt.
+# Dies verhindert eine ungewollte Endlosschleife bei der Umschreibung.
+RewriteCond %{REQUEST_URI} !^/public/
+# Umschreibt alle Anfragen, die nicht mit "/public/" beginnen,
+# indem "/public/" dem Anfang der ursprünglichen Anfrage hinzugefügt wird.
+# Beispiel: Zugriff auf "/example" wird zu "/public/example" umgeschrieben.
+# Das Flag [L] markiert diese Regel als die letzte Regel, die in dieser Verarbeitungsphase angewendet werden soll.
+RewriteRule ^(.*)$ /public/$1 [L]

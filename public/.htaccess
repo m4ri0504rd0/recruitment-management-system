@@ -1,0 +1,8 @@
+# Aktiviert das Umschreiben von URLs
+RewriteEngine On
+# Wende Regel nicht an, wenn angeforderte Ressource eine Datei ist
+RewriteCond %{REQUEST_FILENAME} !-f
+# Wende Regel nicht an, wenn angeforderte Ressource ein Verzeichnis ist
+RewriteCond %{REQUEST_FILENAME} !-d
+# leitet alle Requests, die nicht direkt einer Datei oder einem Verzeichnis zugeordnet werden können, zur index.php
+RewriteRule ^ index.php [QSA,L]
