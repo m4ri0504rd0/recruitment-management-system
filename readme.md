@@ -47,4 +47,40 @@ Eingabe im Terminal der IDE.
 ```bash
 composer dump-autoload
 ```
-Erstelle den ersten commit im `main`-branch.
+Erstelle den ersten commit im `main`-Branch. Die weitere implementierung von externen Packages / Libraries sowie Logik erfolgt in dem `development`-Branch. 
+
+## Der erste Controller
+
+**Erweiterung der Projektstruktur:**
+```txt
+src/Controllers/HomeController.php
+```
+
+**src/Controllers/HomeController.php:**
+```php
+<?php
+
+namespace App\Controllers;
+
+class HomeController
+{
+    // Gibt das echo-statement zurück wenn ein request an localhost/ gesendet wird. 
+    public function index()
+    {
+        echo 'Hallo von src/Views/Home/index.php';
+    }
+}
+```
+
+**public/index.php:**
+```php
+<?php
+// Autoloader
+require_once __DIR__ . '/../vendor/autoload.php';
+
+$controller = new App\Controllers\HomeController();
+$controller->index();
+```
+
+
+
