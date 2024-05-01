@@ -39,8 +39,8 @@ switch ($routeInfo[0]) {
         break;
     case FastRoute\Dispatcher::FOUND:
         // Route gefunden, Handler ausführen
-        $handler = $routeInfo[1];
-        $vars = $routeInfo[2];
+        $handler = $routeInfo[1]; // TODO: CHECK Potential Object Injection
+        $vars = $routeInfo[2]; // TODO: CHECK Potential Object Injection
         list($class, $method) = explode('::', $handler, 2);
         call_user_func_array([new $class, $method], $vars);
         break;
