@@ -9,6 +9,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 // Dispatcher einrichten
 $dispatcher = FastRoute\simpleDispatcher(function(FastRoute\RouteCollector $route) {
     $route->addRoute('GET', '/', 'App\Controllers\HomeController::index');
+    $route->addRoute('GET', '/jobangebote', 'App\Controllers\JobangeboteController::index');
     // Weitere Routen ...
 });
 

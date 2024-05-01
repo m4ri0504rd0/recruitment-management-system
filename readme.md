@@ -139,4 +139,112 @@ switch ($routeInfo[0]) {
 }
 ```
 
+## Ein BaseController mit loadView() implementieren
+Hier kann die Vererbung der Objekt orientierten Programmierung eingesetzt werden.
+Eine abstrakte BaseController-Klasse definiert die Methodensignatur, welche in einer erweiternden BaseController-
+Klasse zwingend erforderlich ist.
+```txt
+AbstractBaseController --> BaseController
+```
+Die BaseController-Class stellt allen implementierenden Controller-Klassen eine loadView-Methode bereit, die eine
+zugehörige View rendered.
+```txt
+AbstractBaseController --> BaseController --> JobangeboteController
+```
+Im JobangeboteController ist die loadView-Methode, deren Signatur im AbastractBaseController defineirt und deren
+Methodenkörper in der BaseController-Klasse geschrieben wurde, verfügbar.
 
+### Hier eine Checkliste für die nächsten Schritte:
+
+- [ ] Abstrakte BaseController Class definieren
+- [ ] BaseController erstellen
+- [ ] loadView-Methode definieren
+- [ ] JobangeboteController mit index-Methode erstellen
+- [ ] Im **View**-Directory ein subdirectory **jobangebote** mit einer index.php erstellen
+- [ ] Route erstellen
+
+**src/Controllers/AbstractBaseController.php:**
+Definiert Methoden die in der erweiternden Klasse vorhanden sein müssen. Es wird lediglich die Methoden-Signatur 
+definiert.
+
+```php
+<?php
+
+namespace App\Controllers;
+
+abstract class AbstractBaseController
+{
+    // Erzwingt die Definition dieser Methode durch die erweiternde Klasse. Funktioniert nicht bei Eigenschaften.
+    abstract public function loadView($viewName, $subDir = '', $data = []): void;
+}
+```
+
+**src/Controllers/BaseController.php:**
+Erweitert die AbstractBaseController-Class. Hier wird der Methodenkörper definiert.
+```php
+<?php
+
+namespace App\Controllers;
+
+use App\Controllers\AbstractBaseController;
+
+class BaseController extends AbstractBaseController
+{
+    // Path zum View Verzeichnis
+    protected string $viewsPath = __DIR__ . '/../Views';
+
+// Methode zum Laden einer View aus einem Unterverzeichnis definieren
+    public function loadView($viewName, $subDir = '', $data = []): void
+    {
+        // Prüfen, ob Unterverzeichnis angegeben wurde und entsprechend den Pfad anpassen
+        $path = $this->viewsPath . ($subDir ? '/' . $subDir . '/' : '') . $viewName . '.php';
+
+        // Prüfe ob File existiert
+        if (file_exists($path)) {
+            // Variablen für die View verfügbar machen
+            extract($data);
+
+            // View-File einbinden
+            require($path);
+        } else {
+            // Fehlermeldung, wenn die Datei nicht gefunden wird
+            echo "Die View $viewName konnte nicht gefunden werden.";
+        }
+    }
+}
+```
+
+**src/Controllers/JobangeboteController.php:**
+Der JobangeboteController erweitert den BaseController:
+```php
+<?php
+
+namespace App\Controller;
+
+use App\Controllers\BaseController;
+
+// JobangeboteController erweitert den BaseController und erbt die loadView-Methode
+class JobangeboteController extends BaseController
+{
+    // Zeigt die index-View von Jobangebote an
+    public function index()
+    {
+//        $this->loadView('index','jobangebote');     // Ok
+        parent::loadView('index', 'jobangebote');   // Besser
+    }
+}
+```
+
+**src/Views/jobangebote/index.php:**
+```php
+<?php
+
+echo "jobangebote - index";
+```
+
+**public/index.php:**
+
+Eine Route muss hinzugefügt werden, damit der Controller den Request korrekt verarbeiten kann.
+```php
+    $route->addRoute('GET', '/jobangebote', 'App\Controllers\JobangeboteController::index');
+```
