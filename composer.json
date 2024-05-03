@@ -5,6 +5,8 @@
     }
   },
   "require": {
-    "nikic/fast-route": "^1.3"
+    "nikic/fast-route": "^1.3",
+    "envms/fluentpdo": "^2.2",
+    "ext-pdo": "*"
   }
 }

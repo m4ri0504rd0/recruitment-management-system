@@ -248,3 +248,252 @@ Eine Route muss hinzugefügt werden, damit der Controller den Request korrekt ve
 ```php
     $route->addRoute('GET', '/jobangebote', 'App\Controllers\JobangeboteController::index');
 ```
+
+## Implementierung der fluentPDO Library
+Für den Datenbankzugriff wird die [fluentpdo Library von envms](https://github.com/envms/fluentpdo?tab=readme-ov-file)
+per Composer installiert.
+
+**fluentPDO per Composer installieren:**
+```txt
+composer require envms/fluentpdo
+```
+
+In dem **composer.json**-File muss folgender Code im `require`-Scope hinzugefügt werden, damit die PDO Extension als
+Abhängigkeit bekannt gegeben wird:
+```json
+"ext-pdo": "*"
+```
+Das **comoser.json**-File mit komplettem Code
+```json
+{
+  "autoload": {
+    "psr-4": {
+      "App\\": "src"
+    }
+  },
+  "require": {
+    "nikic/fast-route": "^1.3",
+    "envms/fluentpdo": "^2.2.0",
+    "ext-pdo": "*"
+  }
+}
+```
+
+> `"ext-pdo": "*"` Definiert eine Abhängigkeit zur PHP-Erweiterung PDO.
+
+`ext-pdo:` spezifiziert, dass die Abhängigkeit eine PHP-Erweiterung ist. `ext` steht dabei für Extension (Erweiterung) und
+`pdo` ist der spezifische Name der Erweiterung.
+
+`*`: Das Sternchen ist eine Platzhalter-Version, die bedeutet, dass jede Version der PDO-Erweiterung akzeptabel ist.
+
+### Eine Datenbankverbindung herstellen
+
+Für eine saubere Implementierung der Datenbank-Klasse und um alle Credentials an einem zentralen Ort zu organisieren,
+wird im `project-root`-Verzeichnis eine `config.php` mit Konstanten definiert. Die `example.config.php` kann kopiert
+und in `config.php` umbenannt werden. Anschließend werden den Konztanten die Werte für die zugehörigen Credentials
+zugewiesen.
+
+```txt
+/project-root/
+.... config.php
+.... example.config.php
+```
+
+> Die config.php darf niemals in das VCS.
+
+Die Database-Klasse, die für die Verwaltung der Datenbankverbindung und der Initialisierung von FluentPDO zuständig ist,
+sollte in einem Bereich platziert werden, welcher sich nicht im Model, View oder Controller Directory befindet. 
+Diese Klasse fungiert als eine Art Dienst (Service), der von
+anderen Teilen der Anwendung genutzt wird. Es empfiehlt sich, solch einen Service in einem separaten Ordner zu platzieren,
+der Dienste oder Kernfunktionalitäten beherbergt. Zum Beispiel Services, Core oder Config.
+
+```txt
+/project-root/
+.... /src/
+........ /Services/
+........ /......../Database.php
+```
+
+```php
+class Database {
+    private $fluent;
+
+    public function __construct() {
+        $pdo = new PDO('mysql:host=localhost;dbname=your_db', 'your_username', 'your_password');
+        $this->fluent = new \Envms\FluentPDO\Query($pdo);
+    }
+
+    public function getFluent() {
+        return $this->fluent;
+    }
+}
+```
+
+Für die weitere Implementierung kann wieder eine Funktionalität der objektorientierten Programmierung genutzt werden:
+Interface. Ein Interfache ist ein Vertrag, der von allen implementierenden Klassen erfüllt werden muss. Es wird nur die
+Signatur der Methoden definiert.
+
+Das **src/Models/ModelInterface.php**
+```php
+<?php
+
+namespace App\Models;
+
+// Interface für CRUD-Operationen für Model-Klassen
+interface ModelInterface
+{
+    /**
+     *  Holt alle Einträge aus einer DB-Tabelle
+     *
+     * @return mixed
+     */
+    public function findAll(): mixed;
+
+    /**
+     * Holt einen spezifischen Datensatz anhand seiner ID aus einer DB-Tabelle.
+     *
+     * @param $id
+     * @return mixed
+     */
+    public function findById($id): mixed;
+
+
+    /**
+     * Erstellt einen neuen Datensatz in der DB-Tabelle.
+     *
+     * @param $data
+     * @return mixed
+     */
+    public function create($data): mixed;
+
+
+    /**
+     * Aktualisiert einen bestehenden Datensatz, identifiziert per ID, in der DB-Tabelle.
+     *
+     * @param $id
+     * @param $data
+     * @return mixed
+     */
+    public function update($id, $data): mixed;
+
+
+    /**
+     * Löscht einen Datensatz aus der DB-Tabelle anhand seiner ID.
+     *
+     * @param $id
+     * @return mixed
+     */
+    public function delete($id): mixed;
+}
+```
+
+Dieses Interface wird von dem **src/Models/JobangebotModel.php** implementiert:
+In einer privaten Variablen wird ein fluentpdo-Objekt, (das PDO hat die Verbindung zur DB mit unseren Credentials)
+durch den Constructor instanziiert. In dem Interface wurden die Signaturen der zu implementierenden Methoden definiert,
+in der implementierenden Klasse werden die Methodenkörper codiert.
+```php
+<?php
+
+namespace App\Models;
+
+use App\Services\Database;
+use Envms\FluentPDO\Query;
+use PDOStatement;
+
+class JobangebotModel implements ModelInterface
+{
+    private Query $db;
+
+    public function __construct()
+    {
+        $this->db = (new Database())->getFluent();
+    }
+
+    public function findAll(): bool|array
+    {
+        return $this->db->from('jobangebote')->fetchAll();
+    }
+
+    public function findById($id): mixed
+    {
+        return $this->db->from('jobangebote')->where('id', $id)->fetch();
+    }
+
+    public function create($data): bool|int
+    {
+        return $this->db->insertInto('jobangebote', $data)->execute();
+    }
+
+    public function update($id, $data): bool|int|PDOStatement
+    {
+        return $this->db->update('jobangebote', $data, $id)->execute();
+    }
+
+    public function delete($id): bool
+    {
+        return $this->db->deleteFrom('jobangebote')->where('id', $id)->execute();
+    }
+}
+```
+
+In dem **src/Controllers/JobangeboteController.php** wird
+die Index-Methode refactored, indem das Model alle Daten aus der jobangebote-Tabelle anfragt und an die View als 
+weiteren Parameter übergibt.
+```php
+<?php
+
+namespace App\Controllers;
+
+use App\Models\JobangebotModel;
+
+class JobangeboteController extends BaseController
+{
+    private JobangebotModel $model;
+
+    public function __construct()
+    {
+        $this->model = new JobangebotModel();
+    }
+
+    /**
+     * Zeigt die index-View von joangebote, mit allen vorhandenen Einträgen aus der jobangebote-Tabelle, an.
+     *
+     * @return void
+     */
+    public function index(): void
+    {
+        // Holt alle Einträge aus der jobangebote Tabelle.
+        $jobs = $this->model->findAll();
+
+//        $this->loadView('index','jobangebote');     // Ok
+
+        // Lädt die index-View aus Views/jobangebote und übergibt $jobs als weiteren Parameter.
+        parent::loadView('index', 'jobangebote', $jobs);   // Besser
+    }
+}
+```
+
+In **src/Views/jobangebote/index.php** wird überprüft, ob der vom Controller übergebende Parameter (das Array) nicht
+leer ist. Falls leer, wird eine Information ausgegeben, wenn es nicht leer ist, kann über das Array iteriert werden und die angefragten Daten dynamisch generiert
+werden.
+
+Die Funktion **htmlspecialchars()** konvertiert bestimmte Zeichen in HTML-Entitäten. Dadurch können diese keinen Schaden
+anrichten.
+```php
+<?php
+
+echo "jobangebote - index";
+
+//echo "<pre>";
+//print_r($data);
+//echo "</pre>";
+
+
+if(is_array($data)) {
+    foreach ($data as $job) {
+        echo "<p>Titel:" . htmlspecialchars($job['jobtitel']) . "</p>";
+    }
+} else {
+    echo "<p>Aktuell keine Jobs vorhanden </p>";
+}
+```
