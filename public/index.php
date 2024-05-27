@@ -10,6 +10,13 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $dispatcher = FastRoute\simpleDispatcher(function(FastRoute\RouteCollector $route) {
     $route->addRoute('GET', '/', 'App\Controllers\HomeController::index');
     $route->addRoute('GET', '/jobangebote', 'App\Controllers\JobangeboteController::index');
+    $route->addRoute('GET', '/jobangebote/{id:\d+}', 'App\Controllers\JobangeboteController::showView');
+    $route->addRoute('GET', '/jobangebote/create', 'App\Controllers\JobangeboteController::create');
+    $route->addRoute('POST', '/jobangebote/create', 'App\Controllers\JobangeboteController::create');
+    $route->addRoute('GET', '/jobangebote/{id:\d+}/edit', 'App\Controllers\JobangeboteController::editView');
+    $route->addRoute('POST', '/jobangebote/update', 'App\Controllers\JobangeboteController::update');
+    $route->addRoute('POST', '/jobangebote/delete', 'App\Controllers\JobangeboteController::delete');
+    $route->addRoute('GET', '/jobangebote/{id:\d+}/delete', 'App\Controllers\JobangeboteController::deleteView');
     // Weitere Routen ...
 });
 

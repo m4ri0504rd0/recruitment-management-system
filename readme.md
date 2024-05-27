@@ -468,32 +468,447 @@ class JobangeboteController extends BaseController
 //        $this->loadView('index','jobangebote');     // Ok
 
         // Lädt die index-View aus Views/jobangebote und übergibt $jobs als weiteren Parameter.
-        parent::loadView('index', 'jobangebote', $jobs);   // Besser
+        parent::loadView('index', 'jobangebote', ['jobs' => $jobs]);   // Besser
     }
 }
 ```
 
-In **src/Views/jobangebote/index.php** wird überprüft, ob der vom Controller übergebende Parameter (das Array) nicht
-leer ist. Falls leer, wird eine Information ausgegeben, wenn es nicht leer ist, kann über das Array iteriert werden und die angefragten Daten dynamisch generiert
-werden.
+Im **src/Views/jobangebote/index.php** wird überprüft, ob der vom Controller übergebene Parameter (ein Array) nicht leer 
+ist. Wenn das Array leer ist, wird eine entsprechende Information angezeigt. Ist das Array hingegen nicht leer, kann 
+darüber iteriert werden, um die angeforderten Daten dynamisch zu generieren.
 
-Die Funktion **htmlspecialchars()** konvertiert bestimmte Zeichen in HTML-Entitäten. Dadurch können diese keinen Schaden
-anrichten.
+Die Funktion **htmlspecialchars()** konvertiert bestimmte Zeichen in HTML-Entitäten, um die Sicherheit der Anwendung zu 
+gewährleisten. Anschließend werden Links definiert, die Details zu einem Eintrag anzeigen, sowie zum Bearbeiten und 
+Löschen des Eintrags verwendet werden können. Abschließend wird ein Link zum Erstellen neuer Jobangebote implementiert
+
 ```php
-<?php
-
-echo "jobangebote - index";
-
-//echo "<pre>";
-//print_r($data);
-//echo "</pre>";
-
-
-if(is_array($data)) {
-    foreach ($data as $job) {
-        echo "<p>Titel:" . htmlspecialchars($job['jobtitel']) . "</p>";
+if (is_array($jobs)) {
+    foreach ($jobs as $job) {
+        echo "<p>Titel: " . htmlspecialchars($job['jobtitel']) . "</p>";
+        echo '<a href="/jobangebote/' . htmlspecialchars($job['id']) . '">Details</a> ';
+        echo '<a href="/jobangebote/' . htmlspecialchars($job['id']) . '/edit">Bearbeiten</a> ';
+        echo '<a href="/jobangebote/' . htmlspecialchars($job['id']) . '/delete">Löschen</a>';
     }
 } else {
     echo "<p>Aktuell keine Jobs vorhanden </p>";
+}
+
+echo '<hr> <a href="/jobangebote/create">Create</a>';
+```
+
+Der JobangebotController verfüt uber eine showView Methode, die einen spezifischen Eintrag aus der Datenbank anhand
+seiner ID findet und an die show-View übergibt.
+```php
+public function showView(int $id): void
+{
+    $job = $this->model->findById($id);
+
+    parent::loadView('show', 'jobangebote', ['job' => $job]);
+}
+```
+
+Die **src/Views/jobangebote/show.php** zeigt die Details zu dem Eintrag an. Auch hier wird der Fall behandelt, falls
+keine Daten angezeigt werden können.
+```php
+<?php
+
+echo "jobangebote - show";
+
+//echo "<pre>";
+//print_r($job);
+//echo "</pre>";
+
+?>
+
+<h1>Jobangebot details</h1>
+    <?php if ($job): ?>
+        <p><strong>Titel:</strong> <?php echo htmlspecialchars($job['jobtitel']); ?></p>
+        <p><strong>Beschreibung:</strong> <?php echo htmlspecialchars($job['beschreibung']); ?></p>
+    <?php else: ?>
+        <p>Jobangebot nicht gefunden.</p>
+    <?php endif; ?>
+```
+
+Die editView Methode aus dem **JobangeboteController** findet einen Eintrag aus der Datenbank mithilfe der findById
+Methode und übergibt dein Eintrag an die create Methode. Dies setzt die DRY Prinzipien um.  
+
+```php
+    public function editView(int $id): void
+    {
+        $job = $this->model->findById($id);
+        $this->loadView('create', 'jobangebote', ['data' => $job]);
+    }
+```
+
+Das **src/Views/jobangebote/create.php**-File dient zur Erstellung und Bearbeitung von Jobangeboten und implementiert 
+das DRY-Prinzip (Don't Repeat Yourself).
+
+#### DRY-Prinzip
+Durch die dynamische Generierung von Formular-Titel, Aktions-URL und Formularfeldern wird wiederholter Code vermieden, was das Formular flexibler und leichter wartbar macht
+
+#### Formulartitel und Aktions-URL
+Der Titel des Formulars sowie die Aktions-URL werden dynamisch generiert, basierend auf dem Vorhandensein einer id im 
+übergebenen $data-Array. Wenn eine id vorhanden ist, wird der Titel auf "Jobangebot bearbeiten" gesetzt und das Formular
+sendet die Daten an /jobangebote/update. Wenn keine id vorhanden ist, lautet der Titel "Jobangebot erstellen" und das
+Formular sendet die Daten an /jobangebote/create.
+
+#### Verstecktes Feld
+Wenn eine id vorhanden ist, wird ein verstecktes Eingabefeld mit der id hinzugefügt, um die Identität des zu
+bearbeitenden Jobangebots zu übermitteln.
+
+#### Formularfelder mit Fehlerbehandlung
+Für jedes Formularfeld (z.B. abteilung_id, jobtitel, beschreibung) wird überprüft, ob ein Wert im $data-Array vorhanden ist. Falls vorhanden, wird dieser Wert als Standardwert für das entsprechende Eingabefeld gesetzt, um die Formulardaten bei einem Fehler nicht zu verlieren (Form Data Persistence).
+Zudem wird für jedes Feld geprüft, ob im $errors-Array ein Fehler vorhanden ist. Falls ja, wird eine Fehlermeldung neben dem entsprechenden Feld angezeigt.
+
+#### Submit-Button
+Der Text des Submit-Buttons ändert sich dynamisch je nachdem, ob eine id vorhanden ist. Für die Bearbeitung wird "Aktualisieren" angezeigt, für die Erstellung "Erstellen".
+```php
+<?php
+
+echo "jobangebote - create";
+
+?>
+
+<h1><?php echo isset($data['id']) ? 'Jobangebot bearbeiten' : 'Jobangebot erstellen'; ?></h1>
+
+<!--<form action="/jobangebote/create" method="post">-->
+<form action="/jobangebote/<?php echo isset($data['id']) ? 'update' : 'create'; ?>" method="post">
+
+    <!-- Hidden field -->
+    <?php if (isset($data['id'])): ?>
+        <input type="hidden"
+               name="id"
+               value="<?php echo htmlspecialchars($data['id']); ?>"
+        >
+    <?php endif; ?>
+
+    <!--  NUMBER  with Form Data Persistence -->
+    <div class="form-group">
+        <label for="abteilung_id">Abteilung_id:</label>
+        <input type="number"
+               id="abteilung_id"
+               name="abteilung_id"
+               value="<?php echo htmlspecialchars($data['abteilung_id'] ?? ''); ?>"
+        />
+
+
+        <!-- Error msg -->
+        <?php if (isset($errors['abteilung_id'])): ?>
+            <span id="error-abteilung_id" style="color: red;">
+                <?php echo htmlspecialchars($errors['abteilung_id']); ?>
+            </span>
+        <?php endif; ?>
+    </div>
+
+    <!--  TEXT with Form Data Persistence  -->
+    <div class="form-group">
+        <label for="jobtitel">Jobtitel:</label>
+        <input type="text"
+               id="jobtitel"
+               name="jobtitel"
+               value="<?php echo htmlspecialchars($data['jobtitel'] ?? ''); ?>"
+        />
+
+        <!-- Error msg -->
+        <?php if (isset($errors['jobtitel'])): ?>
+            <span id="error-jobtitel" style="color: red;">
+                <?php echo htmlspecialchars($errors['jobtitel']); ?>
+            </span>
+        <?php endif; ?>
+    </div>
+
+
+    <!--  TEXTAREA  with Form Data Persistence -->
+    <div class="form-group">
+        <label for="beschreibung">Beschreibung:</label>
+        <textarea id="beschreibung"
+                  name="beschreibung"
+                  rows="4"
+                  cols="50">
+
+            <?php echo htmlspecialchars($data['beschreibung'] ?? ''); ?>
+
+        </textarea>
+
+        <!-- Error msg -->
+        <?php if (isset($errors['beschreibung'])): ?>
+            <span id="error-beschreibung" style="color: red;">
+                <?php echo htmlspecialchars($errors['beschreibung']); ?>
+            </span>
+        <?php endif; ?>
+    </div>
+
+    <!--  SUBMIT  -->
+    <button type="submit">
+        <?php echo isset($data['id']) ? 'Aktualisieren' : 'Erstellen'; ?>
+    </button>
+
+</form>
+```
+
+Die Methode **create im JobangeboteController** behandelt sowohl GET- als auch POST-Anfragen zur Erstellung eines neuen Jobangebots. Hier ist eine detaillierte Beschreibung der Abläufe:
+POST-Request
+
+#### Überprüfung der Anfragemethode:
+Die Methode überprüft zuerst, ob die Anfrage eine POST-Anfrage ist.
+
+#### Überprüfung und Verarbeitung der POST-Daten:
+Wenn POST-Daten vorhanden sind, werden sie verarbeitet.
+
+#### Sanitizing der Eingaben:
+Die Benutzereingaben in $_POST werden durch die Methode sanitizeInput bereinigt, um mögliche schädliche Daten zu entfernen.
+
+#### Validierung der Eingaben:
+Die bereinigten Daten werden mittels der validate-Methode validiert.
+Die validate-Methode überprüft, ob die Eingaben den gewünschten Kriterien entsprechen und gibt eventuell Fehler zurück.
+
+#### Fehlerfreie Eingaben:
+**Wenn keine Validierungsfehler vorhanden sind:**
+Die Daten werden in die Datenbank geschrieben, indem die create-Methode des Modells aufgerufen wird.
+Nach dem Speichern der Daten wird die index-Methode des Controllers aufgerufen, um die Übersicht der Jobangebote anzuzeigen.
+
+#### Fehlerhafte Eingaben:
+**Wenn Validierungsfehler vorliegen:**
+Die Fehler sowie die eingegebenen Daten werden an die View weitergegeben, um dem Benutzer die Möglichkeit zu geben, die Fehler zu korrigieren. Dies geschieht durch Aufruf von parent::loadView mit den entsprechenden Parametern.
+
+#### GET-Request
+
+**Anzeigen des Formulars:**
+Wenn die Anfrage keine POST-Anfrage ist (also eine GET-Anfrage), wird einfach die View create geladen, die das Formular zur Erstellung eines neuen Jobangebots anzeigt.
+
+```php
+public function create(): void
+{
+
+    // POST-Request
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+
+        if (isset($_POST)) {
+
+//                echo "<pre>";
+//                print_r($_POST);
+//                echo "</pre>";
+
+            // Sanitize (Bereinigen) der Benutzereingaben
+            $data = $this->sanitizeInput($_POST);
+
+            // Serverseitige Validierung der Felder
+            $errors = $this->validate($data);
+
+            // Wenn keine Validierungsfehler
+            if (empty($errors)) {
+                // Schreibe in DB
+                $this->model->create($data);
+                // Rufe von diesem Controller die index-Methode auf
+                $this->index();
+            } else {
+                // Fehler an die View weitergeben oder Fehlerbehandlung durchführen
+                parent::loadView('create', 'jobangebote', ['data' => $data, 'errors' => $errors]);
+            }
+        }
+
+    }
+    else
+    // GET-Request
+    {
+        parent::loadView('create', 'jobangebote');
+    }
+}
+```
+
+In der create und update Methode werden die Hilfsfunktionen sanitizeInput sowie validate aufgerufen.
+
+Die **sanitizeInput-Methode** dient dazu, alle Eingaben in einem Array zu bereinigen und sicherzustellen, dass sie keine
+schädlichen Inhalte enthalten. Hier ist eine detaillierte Beschreibung der Funktionsweise:
+
+Funktionsweise
+
+#### Initialisierung:
+Ein leeres Array $sanitizedData wird erstellt, um die bereinigten Daten zu speichern.
+
+#### Durchlauf durch die Eingabedaten:
+Die Methode iteriert durch jedes Element des übergebenen Arrays $data.
+
+#### Bereinigung der Eingabewerte:
+Für jeden Schlüssel-Wert-Paar ($key => $value) im Array:
+- Trimmen: Entfernt führende und nachfolgende Leerzeichen im Wert.
+- Konvertierung in HTML-Entitäten: htmlspecialchars konvertiert spezielle Zeichen in HTML-Entitäten, um sicherzustellen, dass die Daten sicher in HTML kontexten verwendet werden können. Dies verhindert Cross-Site Scripting (XSS)-Angriffe.
+- Die Option ENT_QUOTES stellt sicher, dass sowohl einfache als auch doppelte Anführungszeichen konvertiert werden.
+- Der Zeichensatz UTF-8 wird spezifiziert, um sicherzustellen, dass die Konvertierung korrekt für mehrsprachige Inhalte funktioniert.
+
+#### Speichern der bereinigten Werte:
+Der bereinigte Wert wird in das Array $sanitizedData unter demselben Schlüssel gespeichert.
+
+#### Rückgabe der bereinigten Daten:
+Das Array $sanitizedData, das nun alle bereinigten Eingabewerte enthält, wird zurückgegeben.
+
+```php
+private function sanitizeInput(array $data): array
+{
+    $sanitizedData = [];
+    foreach ($data as $key => $value) {
+        $sanitizedData[$key] = htmlspecialchars(trim($value), ENT_QUOTES, 'UTF-8');
+    }
+    return $sanitizedData;
+}
+```
+
+Diese **validate-Methode** überprüft die Gültigkeit der Benutzereingaben und gibt ein Array mit Fehlernachrichten zurück, falls Eingaben nicht den definierten Kriterien entsprechen. Hier ist eine detaillierte Beschreibung der Funktionsweise:
+Funktionsweise
+
+#### Initialisierung:
+Ein Array $fields enthält die Namen der Felder, die validiert werden sollen: abteilung_id, jobtitel, und beschreibung.
+Ein leeres Array $errors wird erstellt, um eventuelle Validierungsfehler zu speichern.
+
+#### Durchlauf durch die Felder:
+Die Methode iteriert durch jedes Element im Array $fields.
+
+#### Überprüfung auf leere Felder:
+Für jedes Feld wird überprüft, ob es leer ist (empty($data[$field])).
+Wenn ein Feld leer ist, wird eine entsprechende Fehlermeldung in $errors gespeichert. Die Fehlermeldung wird dabei dynamisch erstellt, indem der Feldname mit einem Großbuchstaben beginnt (ucfirst($field)).
+
+#### Feldspezifische Validierung:
+Wenn das Feld nicht leer ist, wird eine feldspezifische Validierung durchgeführt:
+- abteilung_id: Überprüfung, ob der Wert eine Zahl ist (is_numeric($data[$field])). Falls nicht, wird eine Fehlermeldung gespeichert.
+- jobtitel: Überprüfung, ob der Wert mindestens 5 Zeichen lang ist (strlen($data[$field]) < 5). Falls nicht, wird eine Fehlermeldung gespeichert.
+- beschreibung: Überprüfung, ob der Wert mindestens 10 Zeichen lang ist (strlen($data[$field]) < 10). Falls nicht, wird eine Fehlermeldung gespeichert.
+
+#### Rückgabe der Fehler:
+Das Array $errors, das alle gefundenen Validierungsfehler enthält, wird zurückgegeben.
+
+```php
+private function validate(array $data): array
+{
+    $fields = ['abteilung_id', 'jobtitel', 'beschreibung'];
+    $errors = [];
+
+    foreach ($fields as $field)
+    {
+        // Wenn ein Feld leer ist
+        if (empty($data[$field]))
+        {
+            $errors[$field] = ucfirst($field) . ' ist erforderlich.';
+        } else
+        {
+            switch ($field)
+            {
+                case 'abteilung_id':
+                    if (!is_numeric($data[$field]))
+                    {
+                        $errors[$field] = 'Abteilung ID muss eine Zahl sein.';
+                    }
+                    break;
+                case 'jobtitel':
+                    if (strlen($data[$field]) < 5)
+                    {
+                        $errors[$field] = 'Jobtitel muss mindestens 5 Zeichen lang sein.';
+                    }
+                    break;
+                case 'beschreibung':
+                    if (strlen($data[$field]) < 10)
+                    {
+                        $errors[$field] = 'Beschreibung muss mindestens 10 Zeichen lang sein.';
+                    }
+                    break;
+            }
+        }
+    }
+
+    return $errors;
+}
+```
+Diese **update-Methode im JobangeboteController** behandelt die Aktualisierung eines bestehenden Jobangebots. Hier ist eine detaillierte Beschreibung der Abläufe:
+Funktionsweise
+
+#### Überprüfung der ID:
+Die Methode überprüft, ob eine id im POST-Request vorhanden ist ($id = $_POST['id'] ?? null).
+        Wenn keine id vorhanden ist ($id === null), wird ein HTTP-Statuscode 400 (Bad Request) zurückgegeben und eine Fehlermeldung "Invalid ID" ausgegeben. Die Methode wird dann beendet (return).
+
+#### Sanitizing der Eingaben:
+Die POST-Daten werden mit der Methode sanitizeInput bereinigt, um schädliche Inhalte zu entfernen.
+
+#### Validierung der Eingaben:
+Die bereinigten Daten werden mit der validate-Methode validiert. Es werden die Felder abteilung_id, jobtitel und beschreibung überprüft.
+
+#### Fehlerfreie Eingaben:
+**Wenn keine Validierungsfehler vorliegen (empty($errors)):**
+- Die Daten werden in der Datenbank aktualisiert, indem die update-Methode des Modells aufgerufen wird.
+- Nach dem Aktualisieren wird die index-Methode des Controllers aufgerufen, um die Übersicht der Jobangebote anzuzeigen.
+
+#### Fehlerhafte Eingaben:
+**Wenn Validierungsfehler vorliegen:**
+- Die Fehler und die eingegebenen Daten werden an die View weitergegeben, um dem Benutzer die Möglichkeit zu geben, die Fehler zu korrigieren. Dies geschieht durch Aufruf von loadView mit den entsprechenden Parametern.
+
+```php
+    public function update(): void
+    {
+        $id = $_POST['id'] ?? null;
+
+        if ($id === null) {
+            http_response_code(400);
+            echo "Invalid ID";
+            return;
+        }
+
+        // Sanitize (Bereinigen) der Benutzereingaben
+        $data = $this->sanitizeInput($_POST);
+
+        // Validierung
+        $errors = $this->validate($data, ['abteilung_id', 'jobtitel', 'beschreibung']);
+
+        if (empty($errors)) {
+            $this->model->update($id, $data);
+            $this->index();
+        } else {
+            $this->loadView('create', 'jobangebote', ['data' => $data, 'errors' => $errors]);
+        }
+    }
+```
+
+Die deleteView-Methode im Controller ist dafür verantwortlich, die View für das Löschen eines bestimmten Jobangebots anzuzeigen. Hier ist eine detaillierte Beschreibung der Abläufe:
+Funktionsweise
+
+#### Finden des Jobangebots:
+- Die Methode ruft findById($id) vom Modell auf, um das Jobangebot mit der gegebenen ID aus der Datenbank zu finden.
+- Das gefundene Jobangebot wird in der Variable $job gespeichert.
+
+#### Laden der Delete-View:
+- Die Methode ruft loadView auf, um die delete-View im Kontext von jobangebote zu laden.
+- Die View wird mit den Daten des gefundenen Jobangebots (gespeichert in $job) aufgerufen. Diese Daten werden als assoziatives Array mit dem Schlüssel 'data' übergeben.
+
+```php
+public function deleteView(int $id)
+{
+    $job = $this->model->findById($id);
+    $this->loadView('delete', 'jobangebote', ['data' => $job]);
+}
+```
+
+Die delete-Methode im Controller behandelt die Löschanfrage eines bestimmten Jobangebots. Hier ist eine detaillierte Beschreibung der Abläufe:
+Funktionsweise
+
+#### Überprüfung der ID:
+- Die Methode überprüft, ob eine id im POST-Request vorhanden ist ($id = $_POST['id'] ?? null).
+- Wenn keine id vorhanden ist ($id === null), wird ein HTTP-Statuscode 400 (Bad Request) zurückgegeben und eine Fehlermeldung "Invalid ID" ausgegeben. Die Methode wird dann beendet (return).
+
+#### Löschen des Jobangebots:
+- Wenn eine gültige id vorhanden ist, wird die Methode delete($id) vom Modell aufgerufen, um das Jobangebot mit der gegebenen ID aus der Datenbank zu löschen.
+
+#### Rückkehr zur Übersicht:
+- Nach dem Löschen wird die index-Methode des Controllers aufgerufen, um die Übersicht der verbleibenden Jobangebote anzuzeigen.
+
+```php
+public function delete(): void
+{
+    $id = $_POST['id'] ?? null;
+
+    if ($id === null) {
+        http_response_code(400);
+        echo "Invalid ID";
+        return;
+    }
+
+    $this->model->delete($id);
+    $this->index();
 }
 ```

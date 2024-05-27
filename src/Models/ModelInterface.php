@@ -20,7 +20,6 @@ interface ModelInterface
      */
     public function findById($id): mixed;
 
-
     /**
      * Erstellt einen neuen Datensatz in der DB-Tabelle.
      *
